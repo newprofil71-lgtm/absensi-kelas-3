@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Absensi Barcode Online - Kelas 3</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- HTML5 QR / Barcode Scanner Library -->
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+</head>
+<body class="bg-slate-100 min-h-screen text-slate-800 font-sans pb-10">
+
+    <!-- Header / Navbar -->
+    <header class="bg-indigo-700 text-white shadow-lg p-4">
+        <div class="max-w-6xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-2">
+            <div>
+                <h1 class="text-2xl font-bold">Absensi Barcode Online - Kelas 3</h1>
+                <p class="text-xs text-indigo-200">Presensi Masuk (06.30-07.30) & Pulang (10.15-12.00)</p>
+            </div>
+            <div id="clock" class="text-sm font-mono bg-indigo-800 px-3 py-1 rounded border border-indigo-500"></div>
+        </div>
+    </header>
+
+    <main class="max-w-6xl mx-auto mt-6 px-4 grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+        <!-- Kolom 1: Kamera Scanner Barcode & Upload -->
+        <section class="lg:col-span-1 bg-white p-5 rounded-xl shadow-md border border-slate-200">
+            <h2 class="text-lg font-bold mb-3 text-indigo-900 border-b pb-2 flex items-center justify-between">
+                <span>📷 Scan Barcode Siswa</span>
+                <span id="cam-status" class="text-xs font-normal text-amber-600 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">Kamera Siap</span>
+            </h2>
+            
+            <!-- Area Kamera -->
+            <div class="relative bg-slate-900 rounded-lg overflow-hidden border min-h-[250px] flex items-center justify-center">
+                <div id="interactive" class="w-full h-full"></div>
+                <div id="cam-placeholder" class="absolute text-center p-4 text-slate-300">
+                    <p class="text-4xl mb-2">📱</p>
+                    <p class="text-xs font-semibold">Tekan tombol di bawah untuk mengaktifkan Kamera HP / Laptop</p>
+                </div>
+            </div>
+
+            <!-- Tombol Pengaktif Kamera HP -->
+            <div class="mt-3 grid grid-cols-2 gap-2">
+                <button id="btn-start-cam" onclick="startCameraHP()" class="bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 px-3 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1 shadow-md">
+                    📸 Aktifkan Kamera HP
+                </button>
+                <button id="btn-stop-cam" onclick="stopCamera()" class="bg-rose-600 hover:bg-rose-700 text-white py-2.5 px-3 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1 shadow-md opacity-50 cursor-not-allowed" disabled>
+                    ⏹️ Matikan Kamera
+                </button>
+            </div>
+
+            <!-- Pilih Lensa Kamera Manual -->
+            <div class="mt-3">
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Ganti Lensa Kamera:</label>
+                <select id="camera-select" onchange="switchCamera()" class="w-full text-xs border p-2 rounded bg-slate-50 border-slate-300">
+                    <option value="">Otomatis (Kamera Belakang HP)</option>
+                </select>
+            </div>
+
+            <!-- Alternatif Scan: Upload File Gambar Barcode -->
+            <div class="mt-4 pt-3 border-t border-slate-200">
+                <label class="block text-xs font-semibold text-slate-600 mb-1">📁 Upload Foto/Gambar Barcode:</label>
+                <input type="file" id="qr-input-file" accept="image/*" onchange="scanFromFile(event)" class="w-full text-xs text-slate-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 border rounded cursor-pointer">
+            </div>
+
+            <!-- Pesan Hasil Scan -->
+            <div id="scan-result" class="mt-4 p-3 rounded-lg text-sm hidden font-medium"></div>
+
+            <!-- Ketentuan Waktu -->
+            <div class="mt-4 bg-indigo-50 p-3 rounded-lg border border-indigo-100 text-xs text-indigo-900 space-y-1">
+                <p class="font-bold border-b border-indigo-200 pb-1">⏰ Aturan Jam Resmi Absensi:</p>
+                <p>• <b>Absen Masuk:</b> 06:30 - 07:30 WIB</p>
+                <p>• <b>Absen Pulang:</b> 10:15 - 12:00 WIB</p>
+                <p class="text-indigo-700 font-semibold">• Status <b>HADIR</b> wajib memenuhi Scan Masuk DAN Scan Pulang.</p>
+            </div>
+        </section>
+
+        <!-- Kolom 2 & 3: Admin & Tabel Rekap -->
+        <section class="lg:col-span-2 bg-white p-5 rounded-xl shadow-md border border-slate-200">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4 border-b pb-3">
+                <div>
+                    <h2 class="text-lg font-bold text-indigo-900">📊 Panel Admin & Rekap Presensi</h2>
+                    <p class="text-xs text-slate-500">Daftar Siswa Kelas 3 (Total 15 Siswa)</p>
+                </div>
+                <button onclick="exportToCSV()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-lg text-sm font-medium transition flex items-center gap-1.5 shadow-sm">
+                    📥 Download Laporan (CSV)
+                </button>
+            </div>
+
+            <!-- Filter Controls -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4 bg-slate-50 p-3 rounded-lg border border-slate-200">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Pilih Tanggal</label>
+                    <input type="date" id="filter-date" onchange="renderTable()" class="w-full text-sm border p-2 rounded bg-white">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Filter Status Kehadiran</label>
+                    <select id="filter-status" onchange="renderTable()" class="w-full text-sm border p-2 rounded bg-white">
+                        <option value="Semua">Semua Status</option>
+                        <option value="Hadir">Hadir</option>
+                        <option value="Belum Pulang">Belum Pulang (Baru Scan Masuk)</option>
+                        <option value="Sakit">Sakit</option>
+                        <option value="Izin">Izin</option>
+                        <option value="Alpa">Alpa</option>
+                        <option value="Belum Absen">Belum Absen</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Tabel Absensi Siswa Kelas 3 -->
+            <div class="overflow-x-auto rounded-lg border border-slate-200 max-h-[450px]">
+                <table class="w-full text-left text-xs sm:text-sm">
+                    <thead class="bg-slate-100 text-slate-700 uppercase font-semibold sticky top-0 border-b">
+                        <tr>
+                            <th class="p-2.5">Nama Siswa</th>
+                            <th class="p-2.5">Jam Masuk</th>
+                            <th class="p-2.5">Jam Pulang</th>
+                            <th class="p-2.5">Status</th>
+                            <th class="p-2.5 text-center">Aksi Admin</th>
+                        </tr>
+                    </thead>
+                    <tbody id="attendance-table-body" class="divide-y divide-slate-200">
+                        <!-- Data diisi otomatis oleh JS -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Script Utama -->
+    <script>
+        // 1. Data Lengkap 15 Siswa Kelas 3
+        const studentsMaster = [
+            { id: "SIS3176141394", name: "ACHMAD GIOVANO ANSYAH", class: "Kelas 3" },
+            { id: "SIS3182952182", name: "AISHA NURIANA FATIMA ARIFIN", class: "Kelas 3" },
+            { id: "SIS3180821559", name: "ALIKA NAYLA PUTRI", class: "Kelas 3" },
+            { id: "SIS3180747846", name: "ALULA SHAHIN PUTRI NURULLAH", class: "Kelas 3" },
+            { id: "SIS0153730388", name: "DAQIQOTUN NAFISAH", class: "Kelas 3" },
+            { id: "SIS3186684959", name: "DE'FIANA ADINDA RUSMAN", class: "Kelas 3" },
+            { id: "SIS3187065406", name: "FADIL AL FAIRUS KHOIRUDDIN", class: "Kelas 3" },
+            { id: "SIS3171641468", name: "M. RIFKY RAMAN SOLEH", class: "Kelas 3" },
+            { id: "SIS3179271080", name: "MOHAMMAD ALBI ZAID", class: "Kelas 3" },
+            { id: "SIS3175473864", name: "MOHAMMAD SHOLEH", class: "Kelas 3" },
+            { id: "SIS3185967191", name: "MUHAMMAD IQBAL RAFFASYA RIZQI", class: "Kelas 3" },
+            { id: "SIS3180685720", name: "RADIYANTO", class: "Kelas 3" },
+            { id: "SIS3171333063", name: "RIZIEQ FIKRI SANTOSO", class: "Kelas 3" },
+            { id: "SIS3174590227", name: "ZHAFRAN FAIRUZ", class: "Kelas 3" },
+            { id: "SIS3189946371", name: "ZIDAN ALFARIZI", class: "Kelas 3" }
+        ];
+
+        // 2. Storage Local Permanen
+        let attendanceLogs = JSON.parse(localStorage.getItem('attendanceLogs_K3')) || {};
+        document.getElementById('filter-date').value = new Date().toISOString().split('T')[0];
+
+        // Jam Digital Realtime
+        function updateClock() {
+            const now = new Date();
+            document.getElementById('clock').innerText = now.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' }) + ' - ' + now.toLocaleTimeString('id-ID');
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        // 3. Modul Kamera HP / Laptop
+        let html5QrCode = null;
+        let isCamScanning = false;
+
+        async function startCameraHP() {
+            if (isCamScanning) return;
+
+            if (!html5QrCode) {
+                html5QrCode = new Html5Qrcode("interactive");
+            }
+
+            const selectedCamId = document.getElementById('camera-select').value;
+            const cameraConfig = selectedCamId ? selectedCamId : { facingMode: { exact: "environment" } };
+            const fallbackConfig = { facingMode: "environment" };
+            const config = { fps: 10, qrbox: { width: 220, height: 220 } };
+
+            try {
+                document.getElementById('cam-placeholder').classList.add('hidden');
+                try {
+                    await html5QrCode.start(cameraConfig, config, onScanSuccess);
+                } catch (e) {
+                    await html5QrCode.start(fallbackConfig, config, onScanSuccess);
+                }
+
+                isCamScanning = true;
+                updateCamUI(true);
+                loadCameraDevices();
+
+            } catch (err) {
+                console.error("Gagal membuka kamera:", err);
+                alert("⚠️ Gagal Akses Kamera!\n\nPastikan Anda menekan 'Allow/Izinkan' saat browser meminta akses kamera.");
+                document.getElementById('cam-placeholder').classList.remove('hidden');
+                updateCamUI(false);
+            }
+        }
+
+        async function loadCameraDevices() {
+            try {
+                const devices = await Html5Qrcode.getCameras();
+                const select = document.getElementById('camera-select');
+                if (devices && devices.length > 0) {
+                    select.innerHTML = '';
+                    devices.forEach((device, idx) => {
+                        const opt = document.createElement('option');
+                        opt.value = device.id;
+                        opt.innerText = device.label || `Lensa Kamera ${idx + 1}`;
+                        select.appendChild(opt);
+                    });
+                }
+            } catch (err) {
+                console.log("Sistem deteksi lensa kamera manual dilewati.");
+            }
+        }
+
+        async function stopCamera() {
+            if (html5QrCode && isCamScanning) {
+                await html5QrCode.stop();
+                isCamScanning = false;
+                document.getElementById('cam-placeholder').classList.remove('hidden');
+                updateCamUI(false);
+            }
+        }
+
+        async function switchCamera() {
+            if (isCamScanning) {
+                await stopCamera();
+                startCameraHP();
+            }
+        }
+
+        function updateCamUI(active) {
+            const statusEl = document.getElementById('cam-status');
+            const btnStart = document.getElementById('btn-start-cam');
+            const btnStop = document.getElementById('btn-stop-cam');
+
+            if (active) {
+                statusEl.innerText = "Kamera Aktif";
+                statusEl.className = "text-xs font-normal text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200";
+                btnStart.disabled = true;
+                btnStart.classList.add('opacity-50', 'cursor-not-allowed');
+                btnStop.disabled = false;
+                btnStop.classList.remove('opacity-50', 'cursor-not-allowed');
+            } else {
+                statusEl.innerText = "Kamera Siap";
+                statusEl.className = "text-xs font-normal text-amber-600 bg-amber-50 px-2 py-0.5 rounded border border-amber-200";
+                btnStart.disabled = false;
+                btnStart.classList.remove('opacity-50', 'cursor-not-allowed');
+                btnStop.disabled = true;
+                btnStop.classList.add('opacity-50', 'cursor-not-allowed');
+            }
+        }
+
+        // 4. Scan via Upload Foto File
+        function scanFromFile(e) {
+            if (e.target.files.length === 0) return;
+            const file = e.target.files[0];
+            
+            if (!html5QrCode) {
+                html5QrCode = new Html5Qrcode("interactive");
+            }
+
+            html5QrCode.scanFile(file, true)
+                .then(decodedText => {
+                    onScanSuccess(decodedText);
+                })
+                .catch(err => {
+                    const resultDiv = document.getElementById('scan-result');
+                    resultDiv.classList.remove('hidden', 'bg-green-100', 'text-green-700');
+                    resultDiv.classList.add('bg-red-100', 'text-red-700');
+                    resultDiv.innerText = "❌ Barcode tidak terbaca dari gambar. Pastikan gambar jelas.";
+                });
+        }
+
+        // 5. Logika Penerimaan Absen & Waktu Ketat
+        function onScanSuccess(decodedText) {
+            const now = new Date();
+            const timeStr = now.toTimeString().substring(0, 5); // Format HH:MM
+            const dateStr = document.getElementById('filter-date').value;
+
+            // Cari siswa
+            const student = studentsMaster.find(s => s.id === decodedText || s.id.includes(decodedText));
+
+            const resultDiv = document.getElementById('scan-result');
+            resultDiv.classList.remove('hidden', 'bg-red-100', 'text-red-700', 'bg-green-100', 'text-green-700', 'bg-yellow-100', 'text-yellow-700');
+
+            if (!student) {
+                resultDiv.classList.add('bg-red-100', 'text-red-700');
+                resultDiv.innerText = `❌ Barcode tidak terdaftar di Kelas 3: (${decodedText})`;
+                return;
+            }
+
+            if (!attendanceLogs[dateStr]) attendanceLogs[dateStr] = {};
+            if (!attendanceLogs[dateStr][student.id]) {
+                attendanceLogs[dateStr][student.id] = { in: null, out: null, manualStatus: null };
+            }
+
+            const record = attendanceLogs[dateStr][student.id];
+
+            // A. ABSEN MASUK (06:30 - 07:30 WIB)
+            if (timeStr >= "06:30" && timeStr <= "07:30") {
+                if (record.in) {
+                    resultDiv.classList.add('bg-yellow-100', 'text-yellow-700');
+                    resultDiv.innerText = `⚠️ ${student.name} sudah melakukan Scan Masuk jam ${record.in}`;
+                } else {
+                    record.in = timeStr;
+                    resultDiv.classList.add('bg-green-100', 'text-green-700');
+                    resultDiv.innerText = `✅ SCAN MASUK BERHASIL: ${student.name} (${timeStr})`;
+                }
+            } 
+            // B. ABSEN PULANG (10:15 - 12:00 WIB)
+            else if (timeStr >= "10:15" && timeStr <= "12:00") {
+                if (!record.in) {
+                    resultDiv.classList.add('bg-red-100', 'text-red-700');
+                    resultDiv.innerText = `❌ GAGAL: ${student.name} belum Scan Masuk pagi ini!`;
+                } else if (record.out) {
+                    resultDiv.classList.add('bg-yellow-100', 'text-yellow-700');
+                    resultDiv.innerText = `⚠️ ${student.name} sudah melakukan Scan Pulang jam ${record.out}`;
+                } else {
+                    record.out = timeStr;
+                    resultDiv.classList.add('bg-green-100', 'text-green-700');
+                    resultDiv.innerText = `✅ SCAN PULANG BERHASIL: ${student.name} (${timeStr}). Status: HADIR!`;
+                }
+            } 
+            // C. MENOLAK SCAN DI LUAR RENTANG JAM
+            else {
+                resultDiv.classList.add('bg-red-100', 'text-red-700');
+                if (timeStr < "06:30") {
+                    resultDiv.innerText = `⛔ DITOLAK: Absen Masuk belum dibuka (Buka 06:30 WIB). Jam saat ini: ${timeStr}`;
+                } else if (timeStr > "07:30" && timeStr < "10:15") {
+                    resultDiv.innerText = `⛔ DITOLAK: Jam Masuk sudah ditutup (07:30 WIB) & Jam Pulang belum dibuka (10:15 WIB). Jam saat ini: ${timeStr}`;
+                } else if (timeStr > "12:00") {
+                    resultDiv.innerText = `⛔ DITOLAK: Sesi absen hari ini telah ditutup (12:00 WIB). Jam saat ini: ${timeStr}`;
+                }
+            }
+
+            saveLogs();
+            renderTable();
+        }
+
+        function saveLogs() {
+            localStorage.setItem('attendanceLogs_K3', JSON.stringify(attendanceLogs));
+        }
+
+        // 6. Menu Admin Manual (Sakit, Izin, Alpa)
+        function setManualStatus(studentId, status) {
+            const dateStr = document.getElementById('filter-date').value;
+            if (!attendanceLogs[dateStr]) attendanceLogs[dateStr] = {};
+            if (!attendanceLogs[dateStr][studentId]) {
+                attendanceLogs[dateStr][studentId] = { in: null, out: null, manualStatus: null };
+            }
+
+            attendanceLogs[dateStr][studentId].manualStatus = status === 'Reset' ? null : status;
+            saveLogs();
+            renderTable();
+        }
+
+        // 7. Render Tabel Presensi
+        function renderTable() {
+            const dateStr = document.getElementById('filter-date').value;
+            const selectedStatus = document.getElementById('filter-status').value;
+            const tbody = document.getElementById('attendance-table-body');
+            
+            tbody.innerHTML = '';
+            const dayData = attendanceLogs[dateStr] || {};
+
+            studentsMaster.forEach(student => {
+                const log = dayData[student.id] || { in: null, out: null, manualStatus: null };
+                
+                let status = "Belum Absen";
+                let badgeClass = "bg-slate-200 text-slate-700";
+
+                if (log.manualStatus) {
+                    status = log.manualStatus;
+                    if (status === 'Sakit') badgeClass = 'bg-yellow-100 text-yellow-800 border-yellow-300';
+                    if (status === 'Izin') badgeClass = 'bg-blue-100 text-blue-800 border-blue-300';
+                    if (status === 'Alpa') badgeClass = 'bg-red-100 text-red-800 border-red-300';
+                } else if (log.in && log.out) {
+                    status = "Hadir";
+                    badgeClass = "bg-emerald-100 text-emerald-800 border-emerald-300";
+                } else if (log.in) {
+                    status = "Belum Pulang";
+                    badgeClass = "bg-amber-100 text-amber-800 border-amber-300";
+                }
+
+                if (selectedStatus !== 'Semua' && status !== selectedStatus) return;
+
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-50 border-b";
+                tr.innerHTML = `
+                    <td class="p-2.5 font-semibold text-slate-800">${student.name}</td>
+                    <td class="p-2.5 font-mono text-slate-600">${log.in || '-'}</td>
+                    <td class="p-2.5 font-mono text-slate-600">${log.out || '-'}</td>
+                    <td class="p-2.5">
+                        <span class="px-2 py-0.5 rounded text-xs font-bold border ${badgeClass}">${status}</span>
+                    </td>
+                    <td class="p-2.5 text-center">
+                        <select onchange="setManualStatus('${student.id}', this.value)" class="text-xs border rounded p-1 bg-white focus:ring-1 focus:ring-indigo-500">
+                            <option value="Reset">-- Set Status --</option>
+                            <option value="Sakit" ${log.manualStatus==='Sakit'?'selected':''}>Sakit</option>
+                            <option value="Izin" ${log.manualStatus==='Izin'?'selected':''}>Izin</option>
+                            <option value="Alpa" ${log.manualStatus==='Alpa'?'selected':''}>Alpa</option>
+                        </select>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // 8. Download Laporan CSV / Excel
+        function exportToCSV() {
+            const dateStr = document.getElementById('filter-date').value;
+            const dayData = attendanceLogs[dateStr] || {};
+
+            let csv = 'Tanggal,ID Barcode,Nama Siswa,Kelas,Jam Masuk,Jam Pulang,Status Final\n';
+
+            studentsMaster.forEach(student => {
+                const log = dayData[student.id] || { in: null, out: null, manualStatus: null };
+                let status = "Belum Absen";
+                if (log.manualStatus) status = log.manualStatus;
+                else if (log.in && log.out) status = "Hadir";
+                else if (log.in) status = "Belum Pulang";
+
+                csv += `"${dateStr}","${student.id}","${student.name}","Kelas 3","${log.in || ''}","${log.out || ''}","${status}"\n`;
+            });
+
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            const url = URL.createObjectURL(blob);
+            link.setAttribute("href", url);
+            link.setAttribute("download", `Rekap_Absensi_Kelas_3_${dateStr}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        window.onload = () => {
+            renderTable();
+        };
+    </script>
+</body>
+</html>
